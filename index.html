@@ -220,13 +220,16 @@ let STATE={
 function load(){
   try{
     const e=localStorage.getItem(LS_EXPENSES), s=localStorage.getItem(LS_SETTINGS);
-    STATE.expenses = e? JSON.parse(e) : generateSampleExpenses(now.getFullYear(),now.getMonth());
-    STATE.settings = s? JSON.parse(s) : defaultSettings(now.getFullYear(),now.getMonth());
+    // First-time visitor (nothing in this browser's localStorage yet): start completely empty.
+    // Only a returning user (who already has data saved under these keys) sees their own data.
+    STATE.expenses = e? JSON.parse(e) : [];
+    STATE.settings = s? JSON.parse(s) : blankSettings();
     if(!e) localStorage.setItem(LS_EXPENSES, JSON.stringify(STATE.expenses));
     if(!s) localStorage.setItem(LS_SETTINGS, JSON.stringify(STATE.settings));
   }catch(err){
-    STATE.expenses=generateSampleExpenses(now.getFullYear(),now.getMonth());
-    STATE.settings=defaultSettings(now.getFullYear(),now.getMonth());
+    // localStorage unavailable/blocked — still start empty rather than showing anyone else's data.
+    STATE.expenses=[];
+    STATE.settings=blankSettings();
   }
 }
 function saveExpenses(){ try{localStorage.setItem(LS_EXPENSES,JSON.stringify(STATE.expenses));}catch(e){} }
@@ -827,7 +830,9 @@ function renderSettings(){
       <button style="width:100%;background:${RED};color:#fff;border-radius:12px;font-weight:600;font-size:13px;padding:10px 14px" onclick="App.clearAllData()">${icon("trash",14,"#fff")} Delete All Data</button>
     </div>
     <div class="card" style="padding:16px">
-      <button style="width:100%;color:${MUTED};font-weight:600;font-size:13px;padding:10px 14px" onclick="App.resetDemoData()">${icon("undo",14,MUTED)} Reset to Demo Data Instead</button>
+      <div class="section-title" style="margin-bottom:4px">Try Sample Data</div>
+      <div class="muted" style="font-size:11.5px;margin-bottom:10px">Loads example expenses and budgets so you can explore the app. This replaces whatever you currently have — your own data is never shown to anyone else, and no sample data loads automatically.</div>
+      <button class="btn-outline" style="width:100%" onclick="App.resetDemoData()">${icon("undo",14,INK)} Load Sample Data</button>
     </div>
   </div>`;
 }
@@ -1049,7 +1054,7 @@ const App = {
     reader.readAsText(file);
   },
   resetDemoData(){
-    STATE.confirm={message:"Reset to fresh demo data? This replaces everything currently tracked.", danger:false, confirmLabel:"Reset",
+    STATE.confirm={message:"Load sample data for exploring the app? This replaces everything you currently have tracked — your real data (if any) will be gone unless you've exported a backup.", danger:true, confirmLabel:"Load Sample Data",
       action:()=>{
         STATE.settings=defaultSettings(now.getFullYear(),now.getMonth());
         STATE.expenses=generateSampleExpenses(now.getFullYear(),now.getMonth());
