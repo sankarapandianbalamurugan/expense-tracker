@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Budget Tracker</title>
-<meta name="theme-color" content="#4C3FD9">
+<meta name="theme-color" content="#17151F">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -21,66 +21,90 @@
   gtag('config', 'G-S7D5CBQ51J');
 </script>
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
   :root{
-    --purple:#6D5DF6; --purple-dark:#4C3FD9; --green:#17B992; --amber:#F5A524; --red:#F0506E;
-    --ink:#1E1B2E; --muted:#8B87A0; --bg:#F4F2FB; --card:#FFFFFF; --line:rgba(0,0,0,0.06);
+    /* ---- design tokens ---- */
+    --bg:#F7F7F8; --card:#FFFFFF; --surface-2:#F3F3F5;
+    --ink:#15161A; --muted:#6B7280; --muted-2:#9CA3AF; --line:#E7E7EA; --line-strong:#DADCE0;
+    --purple:#4F46E5; --purple-dark:#3730A3; --purple-tint:#EEF2FF;
+    --green:#15803D; --green-tint:#F0FDF4;
+    --amber:#B45309; --amber-tint:#FFFBEB;
+    --red:#DC2626; --red-tint:#FEF2F2;
+    --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-xl:20px;
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px;
+    --ease:cubic-bezier(.4,0,.2,1);
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:'Manrope',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;}
   body{padding-bottom:env(safe-area-inset-bottom);}
   #root{max-width:480px;margin:0 auto;min-height:100vh;background:var(--card);display:flex;flex-direction:column;position:relative;}
   button,input,select{font-family:inherit;}
-  button{cursor:pointer;border:none;background:none;color:inherit;}
-  .tabular{font-variant-numeric:tabular-nums;}
-  .card{background:#fff;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,0.04);border:1px solid var(--line);}
-  .btn-primary{background:var(--purple);color:#fff;border-radius:12px;font-weight:600;font-size:13px;padding:10px 14px;}
-  .btn-outline{border:1px solid rgba(0,0,0,0.1);border-radius:12px;font-weight:600;font-size:13px;padding:10px 14px;}
+  button{cursor:pointer;border:none;background:none;color:inherit;transition:opacity .15s var(--ease), transform .15s var(--ease), background-color .15s var(--ease), border-color .15s var(--ease);}
+  button:active{transform:scale(0.97);}
+  .tabular{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+  .card{background:#fff;border-radius:var(--radius-lg);box-shadow:0 1px 2px rgba(16,24,40,0.03);border:1px solid var(--line);}
+  .btn-primary{background:var(--purple);color:#fff;border-radius:var(--radius-md);font-weight:600;font-size:13px;padding:11px 16px;letter-spacing:-0.01em;}
+  .btn-primary:hover{background:var(--purple-dark);}
+  .btn-outline{border:1px solid var(--line-strong);background:#fff;border-radius:var(--radius-md);font-weight:600;font-size:13px;padding:11px 16px;color:var(--ink);}
+  .btn-outline:hover{background:var(--surface-2);}
   .muted{color:var(--muted);}
   .dot{display:inline-block;border-radius:50%;flex-shrink:0;}
   .row{display:flex;align-items:center;}
   .between{display:flex;align-items:center;justify-content:space-between;}
-  .progress-track{width:100%;background:rgba(0,0,0,0.06);border-radius:99px;overflow:hidden;}
-  .progress-fill{height:100%;border-radius:99px;transition:width .2s;}
+  .progress-track{width:100%;background:var(--surface-2);border-radius:99px;overflow:hidden;}
+  .progress-fill{height:100%;border-radius:99px;transition:width .4s var(--ease);}
   .content{flex:1;overflow-y:auto;padding-bottom:90px;-webkit-overflow-scrolling:touch;}
-  .hero{padding:20px 20px 26px;color:#fff;background:linear-gradient(135deg,var(--purple),var(--purple-dark));}
-  .navbtn{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .hero{padding:24px 20px 28px;color:#fff;background:linear-gradient(165deg,#17151F 0%,#211D33 55%,#2B2645 100%);}
+  .navbtn{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background-color .15s var(--ease);}
+  .navbtn:hover{background:rgba(255,255,255,0.2);}
   .navbtn:disabled{opacity:.3;}
-  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .expense-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .expense-row{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--line);transition:background-color .15s var(--ease);}
   .expense-row:last-child{border-bottom:none;}
-  .cat-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .iconbtn{width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .expense-row:hover{background:var(--surface-2);}
+  .cat-icon{width:34px;height:34px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .iconbtn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:var(--radius-sm);}
+  .iconbtn:hover{background:var(--surface-2);}
   input[type=text],input[type=number],input[type=date],select{
-    width:100%;background:rgba(0,0,0,0.05);border:none;border-radius:12px;padding:10px 12px;font-size:14px;outline:none;color:var(--ink);
+    width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:var(--radius-md);padding:12px 14px;font-size:14px;outline:none;color:var(--ink);transition:border-color .15s var(--ease), box-shadow .15s var(--ease);
   }
+  input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,select:focus{border-color:var(--purple);box-shadow:0 0 0 3px var(--purple-tint);}
   .bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--line);
     display:flex;align-items:center;justify-content:space-between;padding:8px 8px calc(10px + env(safe-area-inset-bottom));z-index:40;}
-  .navitem{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;font-size:9.5px;font-weight:600;}
+  .navitem{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;font-size:9.5px;font-weight:600;transition:color .15s var(--ease);}
   .navitem svg{width:19px;height:19px;}
-  .addbtn{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:-26px;flex-shrink:0;
-    background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 6px 16px rgba(76,63,217,0.4);}
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
+  .addbtn{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:-26px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 8px 20px rgba(79,70,229,0.35);transition:transform .15s var(--ease), box-shadow .15s var(--ease);}
+  .addbtn:hover{box-shadow:0 10px 24px rgba(79,70,229,0.45);}
+  .overlay{position:fixed;inset:0;background:rgba(15,15,20,0.5);z-index:60;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .18s var(--ease);}
   .overlay.center{align-items:center;padding:20px;}
-  .sheet{width:100%;max-width:480px;background:#fff;border-radius:24px 24px 0 0;padding:18px 20px calc(20px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto;}
-  .dialog{width:100%;max-width:320px;background:#fff;border-radius:18px;padding:20px;}
-  .toggle-group{display:flex;background:rgba(0,0,0,0.05);border-radius:12px;padding:4px;}
-  .toggle-group button{flex:1;padding:7px;border-radius:9px;font-size:12px;font-weight:600;}
-  .toggle-group button.active{background:#fff;color:var(--purple);box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+  .sheet{width:100%;max-width:480px;background:#fff;border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto;animation:slideUp .22s var(--ease);}
+  .dialog{width:100%;max-width:320px;background:#fff;border-radius:var(--radius-lg);padding:22px;animation:popIn .18s var(--ease);}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes popIn{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}
+  .toggle-group{display:flex;background:var(--surface-2);border-radius:var(--radius-md);padding:4px;}
+  .toggle-group button{flex:1;padding:8px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;color:var(--muted);}
+  .toggle-group button.active{background:#fff;color:var(--purple);box-shadow:0 1px 2px rgba(16,24,40,0.06);}
   .chip-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
-  .chip-select{font-size:12px;border-radius:10px;background:rgba(0,0,0,0.05);padding:7px 8px;flex-shrink:0;border:none;}
+  .chip-select{font-size:12px;border-radius:var(--radius-sm);background:#fff;border:1px solid var(--line-strong);padding:7px 10px;flex-shrink:0;color:var(--ink);}
   .empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:36px 20px;}
-  .empty .icon-wrap{width:56px;height:56px;border-radius:16px;background:#EFECFE;display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+  .empty .icon-wrap{width:56px;height:56px;border-radius:var(--radius-lg);background:var(--purple-tint);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-  .cal-cell{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;}
+  .cal-cell{aspect-ratio:1;border-radius:var(--radius-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;transition:transform .12s var(--ease);}
+  .cal-cell:hover{transform:scale(1.04);}
   .cal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:10px;}
   .cal-legend span.sw{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;}
-  .section-title{font-size:13px;font-weight:700;margin-bottom:8px;}
-  .top-title{padding:18px 20px 12px;border-bottom:1px solid var(--line);font-size:17px;font-weight:700;}
-  .banner{border-radius:12px;padding:10px 12px;font-size:12px;display:flex;gap:8px;align-items:flex-start;}
+  .section-title{font-size:13px;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em;}
+  .top-title{padding:20px 20px 14px;border-bottom:1px solid var(--line);font-size:17px;font-weight:700;letter-spacing:-0.01em;}
+  .banner{border-radius:var(--radius-md);padding:11px 13px;font-size:12px;display:flex;gap:8px;align-items:flex-start;}
   table.cmp{width:100%;font-size:12px;border-collapse:collapse;}
-  table.cmp td{padding:6px 0;border-top:1px solid var(--line);}
-  table.cmp th{text-align:left;padding-bottom:4px;color:var(--muted);font-weight:600;}
+  table.cmp td{padding:7px 0;border-top:1px solid var(--line);}
+  table.cmp th{text-align:left;padding-bottom:5px;color:var(--muted);font-weight:600;}
   ::-webkit-scrollbar{display:none;}
 </style>
 </head>
@@ -88,7 +112,7 @@
 <div id="root"></div>
 <script>
 /* ============================== helpers ============================== */
-const PURPLE="#6D5DF6",PURPLE_DARK="#4C3FD9",GREEN="#17B992",AMBER="#F5A524",RED="#F0506E",INK="#1E1B2E",MUTED="#8B87A0";
+const PURPLE="#4F46E5",PURPLE_DARK="#3730A3",GREEN="#15803D",AMBER="#B45309",RED="#DC2626",INK="#15161A",MUTED="#6B7280";
 const CATEGORIES=[
   {name:"Food",color:"#FF9F5A"},{name:"Groceries",color:"#17B992"},{name:"Transport",color:"#4F8EF7"},
   {name:"Shopping",color:"#F76FA0"},{name:"Bills",color:PURPLE},{name:"Rent",color:"#9B7EDE"},
@@ -387,7 +411,7 @@ function renderDashboard(d){
         <span>${fmt(d.totalSpent)} / ${fmt(d.monthlyBudget)} spent</span><span>${d.percentUsed.toFixed(1)}% used</span>
       </div>
       <div class="progress-track" style="height:10px;background:rgba(255,255,255,0.2)">
-        <div class="progress-fill" style="width:${Math.min(100,d.percentUsed)}%;background:${d.percentUsed>90?'#FFD9DE':'#fff'}"></div>
+        <div class="progress-fill" style="width:${Math.min(100,d.percentUsed)}%;background:${d.percentUsed>90?'#F87171':'#fff'}"></div>
       </div>
     </div>
     ` : `
@@ -401,7 +425,7 @@ function renderDashboard(d){
   <div style="padding:0 20px;margin-top:-14px">
     ${!d.hasBudget ? `
     <div class="card row" style="padding:16px;gap:12px">
-      <div style="width:36px;height:36px;border-radius:50%;background:#EFECFE;display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon("wallet",16,PURPLE)}</div>
+      <div style="width:36px;height:36px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon("wallet",16,PURPLE)}</div>
       <div style="flex:1"><div style="font-size:12.5px;font-weight:600">No budget set yet</div>
         <div class="muted" style="font-size:11px;margin-top:1px">Set one anytime to see remaining budget and a safe daily spending limit. Your expenses are already being tracked.</div></div>
       <button class="btn-primary" style="flex-shrink:0" onclick="App.setView('budget')">Set Budget</button>
@@ -414,8 +438,8 @@ function renderDashboard(d){
         <div style="text-align:right;font-size:11px;color:${MUTED}">${d.daysRemaining} day${d.daysRemaining!==1?"s":""} left<br>Avg/day so far: <span class="tabular">${fmt(d.avgDailySpend)}</span></div>
       </div>
       ${overToday?
-        `<div class="banner" style="background:#FDECEF;color:${RED};margin-top:12px">${icon("alert",14,RED)}<span>You spent ${fmt(d.todayTotal-d.safeDailyLimit)} more than today's recommended limit.</span></div>`:
-        `<div class="banner" style="background:#E9F9F3;color:${GREEN};margin-top:12px">${icon("check",14,GREEN)}<span>You can spend up to ${fmt(d.safeDailyLimit)} today and stay on budget.</span></div>`}
+        `<div class="banner" style="background:#FEF2F2;color:${RED};margin-top:12px">${icon("alert",14,RED)}<span>You spent ${fmt(d.todayTotal-d.safeDailyLimit)} more than today's recommended limit.</span></div>`:
+        `<div class="banner" style="background:#F0FDF4;color:${GREEN};margin-top:12px">${icon("check",14,GREEN)}<span>You can spend up to ${fmt(d.safeDailyLimit)} today and stay on budget.</span></div>`}
     </div>` : "")}
   </div>
   <div style="padding:0 20px;margin-top:12px" class="stat-grid">
@@ -578,12 +602,12 @@ function renderCalendar(d){
   const cells=[...Array(startOffset).fill(null), ...Array.from({length:dim},(_,i)=>i+1)];
   const limit = d.safeDailyLimit || (d.hasBudget? d.monthlyBudget/dim : 0) || 1;
   function tier(amt){
-    if(amt<=0) return {bg:"#F5F4FA",text:MUTED};
+    if(amt<=0) return {bg:"#F4F4F5",text:MUTED};
     const r=amt/limit;
-    if(r>1.5) return {bg:"#FDE3E8",text:RED};
-    if(r>1) return {bg:"#FEF0DA",text:"#B9720B"};
-    if(r>0.5) return {bg:"#E6F0FE",text:"#2563EB"};
-    return {bg:"#E4F9F1",text:"#0E9F72"};
+    if(r>1.5) return {bg:"#FEF2F2",text:RED};
+    if(r>1) return {bg:"#FFFBEB",text:"#B45309"};
+    if(r>0.5) return {bg:"#EEF2FF",text:"#4F46E5"};
+    return {bg:"#F0FDF4",text:"#15803D"};
   }
   const selExpenses = STATE.calendarDay ? d.monthExpenses.filter(e=>new Date(e.date+"T00:00:00").getDate()===STATE.calendarDay) : [];
   return `
@@ -600,10 +624,10 @@ function renderCalendar(d){
       }).join("")}
     </div>
     <div class="cal-legend">
-      <span><span class="sw" style="background:#E4F9F1"></span>Low</span>
-      <span><span class="sw" style="background:#E6F0FE"></span>Normal</span>
-      <span><span class="sw" style="background:#FEF0DA"></span>High</span>
-      <span><span class="sw" style="background:#FDE3E8"></span>Over limit</span>
+      <span><span class="sw" style="background:#F0FDF4"></span>Low</span>
+      <span><span class="sw" style="background:#EEF2FF"></span>Normal</span>
+      <span><span class="sw" style="background:#FFFBEB"></span>High</span>
+      <span><span class="sw" style="background:#FEF2F2"></span>Over limit</span>
     </div>
     ${STATE.calendarDay? `
     <div style="margin-top:16px">
@@ -636,7 +660,7 @@ function renderBudget(d){
         <div class="row" style="font-weight:500"><span class="dot" style="width:8px;height:8px;background:${catColor(cat)};margin-right:6px"></span>${esc(cat)}</div>
         <div class="row" style="gap:6px">
           <span class="tabular muted">${fmt(spent)} / ${fmt(budget)}</span>
-          ${overBudget?`<span style="font-size:9.5px;font-weight:700;color:${RED};background:#FDECEF;padding:1px 6px;border-radius:99px">OVER</span>`:""}
+          ${overBudget?`<span style="font-size:9.5px;font-weight:700;color:${RED};background:#FEF2F2;padding:1px 6px;border-radius:99px">OVER</span>`:""}
         </div>
       </div>
       <div class="row" style="gap:8px;margin-top:6px">
@@ -671,7 +695,7 @@ function renderBudget(d){
         <div class="section-title" style="margin:0">Category Budgets</div>
         ${s.monthlyBudget>0?`<div class="tabular" style="font-size:11px;font-weight:600;color:${overAllocated?RED:MUTED}">${fmt(totalAllocated)} / ${fmt(s.monthlyBudget)} allocated</div>`:""}
       </div>
-      ${overAllocated?`<div class="banner" style="background:#FDECEF;color:${RED};margin-bottom:10px">${icon("alert",14,RED)}<span>Your category budgets add up to more than your monthly budget by ${fmt(totalAllocated-s.monthlyBudget)}.</span></div>`:""}
+      ${overAllocated?`<div class="banner" style="background:#FEF2F2;color:${RED};margin-bottom:10px">${icon("alert",14,RED)}<span>Your category budgets add up to more than your monthly budget by ${fmt(totalAllocated-s.monthlyBudget)}.</span></div>`:""}
       ${catList.length===0?`
         <div class="card" style="padding:20px">
           <div class="muted" style="font-size:12px;text-align:center">No spending yet this month. Set a budget for a category below to start tracking it.</div>
@@ -825,7 +849,7 @@ function renderReports(d){
             <tr><td>Avg/day</td><td class="tabular" style="text-align:right">${fmt(prevAvg)}</td><td class="tabular" style="text-align:right">${fmt(curAvg)}</td></tr>
           </tbody>
         </table>
-        <div style="text-align:center;font-weight:600;font-size:12px;margin-top:12px;padding:8px;border-radius:12px;background:${d.vsLastMonth>=0?'#E9F9F3':'#FDECEF'};color:${d.vsLastMonth>=0?GREEN:RED}">
+        <div style="text-align:center;font-weight:600;font-size:12px;margin-top:12px;padding:8px;border-radius:12px;background:${d.vsLastMonth>=0?'#F0FDF4':'#FEF2F2'};color:${d.vsLastMonth>=0?GREEN:RED}">
           You spent ${fmt(Math.abs(d.vsLastMonth))} ${d.vsLastMonth>=0?"less":"more"} than last month.
         </div>
       </div>
@@ -872,7 +896,7 @@ function renderMore(MORE){
     <div class="muted" style="font-size:12px;margin-bottom:10px">More tools and settings</div>
     <div class="card">
       ${MORE.map(m=>`<button class="row" style="width:100%;padding:14px 12px;border-bottom:1px solid var(--line);gap:12px" onclick="App.setView('${m[0]}')">
-        <div style="width:36px;height:36px;border-radius:12px;background:#EFECFE;display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon(m[2],16,PURPLE)}</div>
+        <div style="width:36px;height:36px;border-radius:12px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon(m[2],16,PURPLE)}</div>
         <span style="font-size:14px;font-weight:500;flex:1;text-align:left">${m[1]}</span>
         ${icon("chevR",16,MUTED)}
       </button>`).join("")}
@@ -930,7 +954,7 @@ function expenseModalHTML(d){
           <label class="muted" style="font-size:11px;font-weight:500">Description (optional)</label>
           <input id="modalDescription" type="text" value="${esc(m.description)}" placeholder="e.g. Lunch at office" style="margin-top:4px">
         </div>
-        ${m.error ? `<div style="font-size:11.5px;color:${RED};background:#FDECEF;border-radius:10px;padding:8px 10px">${esc(m.error)}</div>` : ""}
+        ${m.error ? `<div style="font-size:11.5px;color:${RED};background:#FEF2F2;border-radius:10px;padding:8px 10px">${esc(m.error)}</div>` : ""}
       </div>
       <button class="btn-primary" style="width:100%;margin-top:18px;padding:13px" onclick="App.saveExpenseFromModal()">Save Expense</button>
     </div></div>`;
@@ -939,7 +963,7 @@ function confirmDialogHTML(){
   const c=STATE.confirm;
   return `<div class="overlay center" onclick="App.cancelConfirm(event)">
     <div class="dialog" onclick="event.stopPropagation()">
-      <div style="width:40px;height:40px;border-radius:50%;background:${c.danger?'#FDECEF':'#EFECFE'};display:flex;align-items:center;justify-content:center;margin-bottom:12px">
+      <div style="width:40px;height:40px;border-radius:50%;background:${c.danger?'#FEF2F2':'#EEF2FF'};display:flex;align-items:center;justify-content:center;margin-bottom:12px">
         ${icon("alert",18,c.danger?RED:PURPLE)}
       </div>
       <div style="font-size:13.5px;line-height:1.4">${esc(c.message)}</div>
