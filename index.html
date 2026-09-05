@@ -482,18 +482,20 @@ function todaysSpendingHTML(d){
   const addDate=isToday?todayISO():isoDate(STATE.year,STATE.month,1);
   const emptyText=isToday?"No expenses recorded today.":`No expenses recorded for ${monthLabel(STATE.year,STATE.month)}.`;
   return `<div style="padding:20px 20px 0">
-    <div class="section-title" style="margin-bottom:2px">${label}</div>
-    <div class="between" style="margin-bottom:6px">
-      <div class="tabular" style="font-size:20px;font-weight:700">${fmt(total)}</div>
-      <button onclick="App.openAdd('${addDate}')" style="font-size:12.5px;font-weight:600;color:${PURPLE}" class="row">${icon("plus",14,PURPLE)}&nbsp;Add Expense</button>
+    <div class="card" style="padding:20px">
+      <div class="section-title" style="margin-bottom:2px">${label}</div>
+      <div class="between" style="margin-bottom:6px">
+        <div class="tabular" style="font-size:20px;font-weight:700">${fmt(total)}</div>
+        <button onclick="App.openAdd('${addDate}')" style="font-size:12.5px;font-weight:600;color:${PURPLE}" class="row">${icon("plus",14,PURPLE)}&nbsp;Add Expense</button>
+      </div>
+      ${list.length===0?`
+        <div style="padding:10px 0 6px;text-align:center">
+          <div class="muted" style="font-size:12.5px">${emptyText}</div>
+          <button style="margin-top:8px;font-size:12.5px;font-weight:600;color:${PURPLE}" onclick="App.openAdd('${addDate}')">+ Add your first expense</button>
+        </div>`:
+        `<div style="margin:0 -20px">${list.map(e=>expenseRowHTML(e,showDate)).join("")}</div>
+        ${(!isToday && d.monthExpenses.length>5)?`<button style="width:100%;font-size:12px;font-weight:600;color:${PURPLE};padding:10px 0 0" onclick="App.setView('expenses')">View all ${d.monthExpenses.length} expenses</button>`:""}`}
     </div>
-    ${list.length===0?`
-      <div style="padding:10px 0 16px;text-align:center">
-        <div class="muted" style="font-size:12.5px">${emptyText}</div>
-        <button style="margin-top:8px;font-size:12.5px;font-weight:600;color:${PURPLE}" onclick="App.openAdd('${addDate}')">+ Add your first expense</button>
-      </div>`:
-      `<div>${list.map(e=>expenseRowHTML(e,showDate)).join("")}</div>
-      ${(!isToday && d.monthExpenses.length>5)?`<button style="width:100%;font-size:12px;font-weight:600;color:${PURPLE};padding:10px 0" onclick="App.setView('expenses')">View all ${d.monthExpenses.length} expenses</button>`:""}`}
   </div>`;
 }
 function spendingInsightsHTML(d){
@@ -502,27 +504,29 @@ function spendingInsightsHTML(d){
   const hasPrevData=d.prevMonthExpenses.length>0;
   const delta=d.totalSpent-d.prevTotalSpent;
   const deltaGood=delta<=0;
-  return `<div style="padding:24px 20px 20px">
-    <div class="section-title">Spending insights</div>
-    ${!top?`<div class="muted" style="font-size:12.5px">No spending yet this month.</div>`:`
-    <div>
-      <div class="between" style="font-size:13.5px">
-        <div class="row" style="gap:7px;font-weight:600"><span class="dot" style="width:9px;height:9px;background:${catColor(top[0])}"></span>${esc(top[0])}</div>
-        <span class="tabular" style="font-weight:700">${fmt(top[1])}</span>
-      </div>
-      <div class="progress-track" style="height:5px;margin-top:8px"><div class="progress-fill" style="width:${total?(top[1]/total*100):0}%;background:${catColor(top[0])}"></div></div>
-    </div>
-    <div style="height:1px;background:var(--line);margin:16px 0"></div>
-    ${hasPrevData?`
-      <div class="between" style="font-size:12.5px">
-        <span class="muted">Compared with ${monthShort(d.prevYear,d.prevMonth)}</span>
-        <span style="font-weight:700;color:${deltaGood?GREEN:RED}">${delta>=0?"+":"−"}${fmt(Math.abs(delta))}</span>
-      </div>`:`
+  return `<div style="padding:20px 20px 20px">
+    <div class="card" style="padding:20px">
+      <div class="section-title">Spending insights</div>
+      ${!top?`<div class="muted" style="font-size:12.5px">No spending yet this month.</div>`:`
       <div>
-        <div style="font-size:12.5px;font-weight:600">No comparison yet</div>
-        <div class="muted" style="font-size:11.5px;margin-top:2px">Add more expenses to see your monthly trend.</div>
-      </div>`}
-    `}
+        <div class="between" style="font-size:13.5px">
+          <div class="row" style="gap:7px;font-weight:600"><span class="dot" style="width:9px;height:9px;background:${catColor(top[0])}"></span>${esc(top[0])}</div>
+          <span class="tabular" style="font-weight:700">${fmt(top[1])}</span>
+        </div>
+        <div class="progress-track" style="height:5px;margin-top:8px"><div class="progress-fill" style="width:${total?(top[1]/total*100):0}%;background:${catColor(top[0])}"></div></div>
+      </div>
+      <div style="height:1px;background:var(--line);margin:16px 0"></div>
+      ${hasPrevData?`
+        <div class="between" style="font-size:12.5px">
+          <span class="muted">Compared with ${monthShort(d.prevYear,d.prevMonth)}</span>
+          <span style="font-weight:700;color:${deltaGood?GREEN:RED}">${delta>=0?"+":"−"}${fmt(Math.abs(delta))}</span>
+        </div>`:`
+        <div>
+          <div style="font-size:12.5px;font-weight:600">No comparison yet</div>
+          <div class="muted" style="font-size:11.5px;margin-top:2px">Add more expenses to see your monthly trend.</div>
+        </div>`}
+      `}
+    </div>
   </div>`;
 }
 function renderDashboard(d){
