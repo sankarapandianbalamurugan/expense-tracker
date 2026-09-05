@@ -106,6 +106,19 @@
   table.cmp td{padding:7px 0;border-top:1px solid var(--line);}
   table.cmp th{text-align:left;padding-bottom:5px;color:var(--muted);font-weight:600;}
   ::-webkit-scrollbar{display:none;}
+  .row-menu-wrap{position:relative;flex-shrink:0;}
+  .row-menu-backdrop{position:fixed;inset:0;z-index:55;background:transparent;}
+  .row-menu{position:absolute;top:100%;right:0;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:var(--radius-md);
+    box-shadow:0 8px 24px rgba(16,24,40,0.14);z-index:56;min-width:132px;overflow:hidden;animation:popIn .15s var(--ease);}
+  .row-menu button{width:100%;text-align:left;padding:10px 14px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:9px;color:var(--ink);}
+  .row-menu button:hover{background:var(--surface-2);}
+  .row-menu button.danger{color:var(--red);}
+  .kicker{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);max-width:calc(480px - 40px);
+    background:#1F2024;color:#fff;font-size:13px;font-weight:500;padding:12px 16px;border-radius:var(--radius-md);
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:70;display:flex;align-items:center;gap:8px;white-space:nowrap;
+    animation:toastIn .2s var(--ease);}
+  @keyframes toastIn{from{opacity:0;transform:translate(-50%,8px);}to{opacity:1;transform:translate(-50%,0);}}
 </style>
 </head>
 <body>
@@ -127,6 +140,15 @@ const now=new Date();
 /* ---- Analytics: fires anonymous, no-payload events only. Never blocks the app if GA is unavailable. ---- */
 function trackEvent(name){
   try { if (typeof gtag === "function") gtag("event", name); } catch(e) { /* ignore analytics failures */ }
+}
+
+/* ---- Snackbar/toast ---- */
+let toastTimer = null;
+function showToast(message){
+  if (toastTimer) clearTimeout(toastTimer);
+  STATE.toast = { message };
+  render();
+  toastTimer = setTimeout(() => { STATE.toast = null; render(); }, 2200);
 }
 
 const fmt=n=>"\u20B9"+Math.round(n||0).toLocaleString("en-IN");
@@ -170,7 +192,7 @@ function monthDropdownHTML(light){
   const style = light
     ? "background:#fff;color:"+INK+";border:1px solid rgba(0,0,0,0.1)"
     : "background:rgba(255,255,255,0.18);color:#fff;border:none";
-  return `<select onchange="App.setMonthDropdown(this.value)" style="width:auto;${style};font-size:12px;font-weight:600;padding:7px 10px;border-radius:10px;-webkit-appearance:none;appearance:none">
+  return `<select onchange="App.setMonthDropdown(this.value)" style="width:auto;${style};font-size:12px;font-weight:600;padding:7px 26px 7px 10px;border-radius:10px;-webkit-appearance:none;appearance:none">
     ${opts.map(o=>`<option value="${o.y}-${o.m}" ${o.y===STATE.year&&o.m===STATE.month?"selected":""} style="color:#000">${monthLabel(o.y,o.m)}</option>`).join("")}
   </select>`;
 }
@@ -221,7 +243,7 @@ function progressColor(pct){if(pct>90)return RED;if(pct>70)return AMBER;return G
 const ICONS={
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   receipt:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
-  pie:'<path d="M12 2v10l8.5 5A10 10 0 1 0 12 2z"/>',
+  pie:'<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
   cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   wallet:'<path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v3"/><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-5a2 2 0 1 0 0 4h6"/>',
   bar:'<path d="M4 20V10M12 20V4M20 20v-7"/>',
@@ -240,17 +262,20 @@ const ICONS={
   repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   download:'<path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
   upload:'<path d="M12 21V9m0 0 4 4m-4-4-4 4"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
-  undo:'<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/>'
+  undo:'<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/>',
+  moreVertical:'<circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r="0.9" fill="currentColor" stroke="none"/>',
+  chevDown:'<path d="m6 9 6 6 6-6"/>'
 };
 function icon(name,size=16,color="currentColor",cls=""){
-  return `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||""}</svg>`;
+  return `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:${color}">${ICONS[name]||""}</svg>`;
 }
 
 /* ============================== state ============================== */
 let STATE={
   expenses:[], settings:null,
   year:now.getFullYear(), month:now.getMonth(),
-  view:"dashboard", modal:null, confirm:null, budgetShowAllCategories:false,
+  view:"dashboard", modal:null, confirm:null, budgetShowAllCategories:false, openRowMenu:null, toast:null, showSafeInfo:false,
   calendarDay:null, trendMode:"daily",
   historyFilters:{search:"",category:"All",payment:"All",sort:"newest",groupBy:"date"}
 };
@@ -374,9 +399,14 @@ function render(){
   // remove any previously-appended overlay(s) before adding the current one(s) —
   // without this, closing a drawer/modal left the old DOM node behind, blocking future clicks
   document.querySelectorAll("body > .overlay").forEach(el => el.remove());
+  document.querySelectorAll("body > .toast").forEach(el => el.remove());
 
   if(STATE.modal){ document.body.insertAdjacentHTML("beforeend", expenseModalHTML(d)); }
   if(STATE.confirm){ document.body.insertAdjacentHTML("beforeend", confirmDialogHTML()); }
+  if(STATE.toast){ document.body.insertAdjacentHTML("beforeend", toastHTML()); }
+}
+function toastHTML(){
+  return `<div class="toast">${icon("check",14,"#fff")}<span>${esc(STATE.toast.message)}</span></div>`;
 }
 function navItemHTML(n,active){
   return `<button class="navitem" style="color:${active?PURPLE:MUTED}" onclick="App.setView('${n[0]}')">
@@ -384,121 +414,165 @@ function navItemHTML(n,active){
 }
 
 /* ============================== dashboard ============================== */
+function healthCopy(d){
+  if(d.percentUsed>100){
+    return {iconName:"alert", color:RED, title:"Over budget",
+      subtitle:`You've exceeded your monthly budget by ${fmt(d.totalSpent-d.monthlyBudget)}.`, extra:""};
+  }
+  if(d.isCurrentMonth && (d.percentUsed-d.monthProgressPct)>15){
+    const projected = d.avgDailySpend*d.dim;
+    const showPredict = d.dayOfMonth>=3 && projected>d.monthlyBudget;
+    return {iconName:"alert", color:AMBER, title:"Spending faster than planned",
+      subtitle:`${Math.round(d.percentUsed)}% of your monthly budget is already used.`,
+      extra: showPredict?"At this pace, you may exceed your monthly budget.":""};
+  }
+  if(!d.isCurrentMonth){
+    return {iconName:"check", color:GREEN, title:"Month summary", subtitle:`${Math.round(d.percentUsed)}% of budget used.`, extra:""};
+  }
+  return {iconName:"check", color:GREEN, title:"You're on track",
+    subtitle:`${Math.round(d.percentUsed)}% used · ${d.daysRemaining} day${d.daysRemaining!==1?"s":""} left.`, extra:""};
+}
+function healthSectionHTML(d){
+  const h=healthCopy(d);
+  return `<div style="padding:20px 20px 0">
+    <div class="row" style="gap:11px;align-items:flex-start">
+      <div style="width:30px;height:30px;border-radius:50%;background:${h.color}1A;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${icon(h.iconName,14,h.color)}</div>
+      <div style="flex:1;padding-top:1px">
+        <div style="font-size:13.5px;font-weight:700;color:${h.color}">${h.title}</div>
+        <div class="muted" style="font-size:12px;margin-top:2px;line-height:1.45">${h.subtitle}${h.extra?`<br>${h.extra}`:""}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function noBudgetPromptHTML(){
+  return `<div style="padding:20px 20px 0">
+    <div class="row" style="gap:11px;align-items:flex-start">
+      <div style="width:30px;height:30px;border-radius:50%;background:${PURPLE}1A;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${icon("wallet",14,PURPLE)}</div>
+      <div style="flex:1;padding-top:1px">
+        <div style="font-size:13.5px;font-weight:700">No budget set yet</div>
+        <div class="muted" style="font-size:12px;margin-top:2px;line-height:1.45">Set one anytime to see your remaining budget and a safe daily spending limit. Your expenses are already being tracked.</div>
+        <button class="btn-primary" style="margin-top:10px;padding:8px 14px;font-size:12.5px" onclick="App.setView('budget')">Set Budget</button>
+      </div>
+    </div>
+  </div>`;
+}
+function safeToSpendHTML(d,overToday){
+  return `<div style="padding:20px">
+    <div class="card" style="padding:20px">
+      <div class="row" style="gap:6px">
+        <div class="kicker">Safe to spend today</div>
+        <button class="iconbtn" style="width:18px;height:18px" onclick="App.toggleSafeInfo()">${icon("info",13,MUTED)}</button>
+      </div>
+      ${STATE.showSafeInfo?`<div class="muted" style="font-size:11px;margin-top:8px;line-height:1.45;background:var(--surface-2);padding:9px 11px;border-radius:8px">Based on your remaining budget divided across the days left in the month.</div>`:""}
+      <div class="tabular" style="font-size:34px;font-weight:800;margin-top:10px;letter-spacing:-0.01em;color:${overToday?RED:INK}">${fmt(d.safeDailyLimit)}</div>
+      <div class="muted" style="font-size:12px;margin-top:4px">${d.daysRemaining} day${d.daysRemaining!==1?"s":""} remaining · <span class="tabular">${fmt(d.avgDailySpend)}</span>/day average</div>
+      <div class="row" style="gap:7px;margin-top:13px;font-size:12.5px;color:${overToday?RED:GREEN};font-weight:600">
+        ${icon(overToday?"alert":"check",14,overToday?RED:GREEN)}
+        <span style="font-weight:500">${overToday?`You spent ${fmt(d.todayTotal-d.safeDailyLimit)} more than today's recommended limit.`:`You can spend up to ${fmt(d.safeDailyLimit)} today and stay on budget.`}</span>
+      </div>
+    </div>
+  </div>`;
+}
+function todaysSpendingHTML(d){
+  const isToday=d.isCurrentMonth;
+  const label=isToday?"Today's spending":`${monthLabel(STATE.year,STATE.month)} spending`;
+  const total=isToday?d.todayTotal:d.totalSpent;
+  const list=isToday?d.todayExpenses:[...d.monthExpenses].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  const showDate=!isToday;
+  const addDate=isToday?todayISO():isoDate(STATE.year,STATE.month,1);
+  const emptyText=isToday?"No expenses recorded today.":`No expenses recorded for ${monthLabel(STATE.year,STATE.month)}.`;
+  return `<div style="padding:20px 20px 0">
+    <div class="section-title" style="margin-bottom:2px">${label}</div>
+    <div class="between" style="margin-bottom:6px">
+      <div class="tabular" style="font-size:20px;font-weight:700">${fmt(total)}</div>
+      <button onclick="App.openAdd('${addDate}')" style="font-size:12.5px;font-weight:600;color:${PURPLE}" class="row">${icon("plus",14,PURPLE)}&nbsp;Add Expense</button>
+    </div>
+    ${list.length===0?`
+      <div style="padding:10px 0 16px;text-align:center">
+        <div class="muted" style="font-size:12.5px">${emptyText}</div>
+        <button style="margin-top:8px;font-size:12.5px;font-weight:600;color:${PURPLE}" onclick="App.openAdd('${addDate}')">+ Add your first expense</button>
+      </div>`:
+      `<div>${list.map(e=>expenseRowHTML(e,showDate)).join("")}</div>
+      ${(!isToday && d.monthExpenses.length>5)?`<button style="width:100%;font-size:12px;font-weight:600;color:${PURPLE};padding:10px 0" onclick="App.setView('expenses')">View all ${d.monthExpenses.length} expenses</button>`:""}`}
+  </div>`;
+}
+function spendingInsightsHTML(d){
+  const top=d.categoryTotals[0];
+  const total=d.totalSpent;
+  const hasPrevData=d.prevMonthExpenses.length>0;
+  const delta=d.totalSpent-d.prevTotalSpent;
+  const deltaGood=delta<=0;
+  return `<div style="padding:24px 20px 20px">
+    <div class="section-title">Spending insights</div>
+    ${!top?`<div class="muted" style="font-size:12.5px">No spending yet this month.</div>`:`
+    <div>
+      <div class="between" style="font-size:13.5px">
+        <div class="row" style="gap:7px;font-weight:600"><span class="dot" style="width:9px;height:9px;background:${catColor(top[0])}"></span>${esc(top[0])}</div>
+        <span class="tabular" style="font-weight:700">${fmt(top[1])}</span>
+      </div>
+      <div class="progress-track" style="height:5px;margin-top:8px"><div class="progress-fill" style="width:${total?(top[1]/total*100):0}%;background:${catColor(top[0])}"></div></div>
+    </div>
+    <div style="height:1px;background:var(--line);margin:16px 0"></div>
+    ${hasPrevData?`
+      <div class="between" style="font-size:12.5px">
+        <span class="muted">Compared with ${monthShort(d.prevYear,d.prevMonth)}</span>
+        <span style="font-weight:700;color:${deltaGood?GREEN:RED}">${delta>=0?"+":"−"}${fmt(Math.abs(delta))}</span>
+      </div>`:`
+      <div>
+        <div style="font-size:12.5px;font-weight:600">No comparison yet</div>
+        <div class="muted" style="font-size:11.5px;margin-top:2px">Add more expenses to see your monthly trend.</div>
+      </div>`}
+    `}
+  </div>`;
+}
 function renderDashboard(d){
   const overToday = d.hasBudget && d.isCurrentMonth && d.todayTotal > d.safeDailyLimit && d.safeDailyLimit>0;
+  const monthCluster = `
+    <div class="row" style="gap:2px;flex-shrink:0">
+      <button class="navbtn" onclick="App.prevMonth()">${icon("chevL",13,"#fff")}</button>
+      <div style="position:relative;display:flex;align-items:center">
+        ${monthDropdownHTML()}
+        <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none">${icon("chevDown",12,"#fff")}</span>
+      </div>
+      <button class="navbtn" onclick="App.nextMonth()" ${d.nextIsFuture?"disabled":""}>${icon("chevR",13,"#fff")}</button>
+    </div>`;
   return `
   <div class="hero">
     <div class="between" style="align-items:flex-start">
       <div>
         <div style="font-size:15px;font-weight:700">${greeting()}</div>
-        <div style="font-size:11.5px;opacity:.8;margin-top:2px">Here's your ${monthLabel(STATE.year,STATE.month).split(" ")[0]} overview</div>
+        <div style="font-size:11.5px;opacity:.75;margin-top:1px">${monthLabel(STATE.year,STATE.month).split(" ")[0]} overview</div>
       </div>
-      ${monthDropdownHTML()}
+      ${monthCluster}
     </div>
-    <div class="between" style="margin-top:16px">
-      <button class="navbtn" onclick="App.prevMonth()">${icon("chevL",14,"#fff")}</button>
-      <div style="font-size:13px;font-weight:500;opacity:.9">${monthLabel(STATE.year,STATE.month)}</div>
-      <button class="navbtn" onclick="App.nextMonth()" ${d.nextIsFuture?"disabled":""}>${icon("chevR",14,"#fff")}</button>
-    </div>
-    ${d.hasBudget ? `
-    <div class="row" style="justify-content:space-between;text-align:center;margin-top:18px">
-      <div><div style="font-size:11px;opacity:.75">Monthly Budget</div><div class="tabular" style="font-size:17px;font-weight:700;margin-top:2px">${fmt(d.monthlyBudget)}</div></div>
-      <div><div style="font-size:11px;opacity:.75">Total Spent</div><div class="tabular" style="font-size:17px;font-weight:700;margin-top:2px">${fmt(d.totalSpent)}</div></div>
-      <div><div style="font-size:11px;opacity:.75">Remaining</div><div class="tabular" style="font-size:17px;font-weight:700;margin-top:2px">${fmt(Math.max(d.remaining,0))}</div></div>
+    ${d.hasBudget?`
+    <div style="margin-top:24px">
+      <div class="tabular" style="font-size:36px;font-weight:800;line-height:1.05;letter-spacing:-0.01em">${fmt(Math.max(d.remaining,0))}</div>
+      <div style="font-size:12.5px;opacity:.8;margin-top:4px">Remaining <span style="opacity:.65">· of ${fmt(d.monthlyBudget)} monthly budget</span></div>
     </div>
     <div style="margin-top:18px">
-      <div class="between" style="font-size:11px;opacity:.9;margin-bottom:6px">
-        <span>${fmt(d.totalSpent)} / ${fmt(d.monthlyBudget)} spent</span><span>${d.percentUsed.toFixed(1)}% used</span>
+      <div class="between" style="font-size:12px;opacity:.9;margin-bottom:7px">
+        <span>${fmt(d.totalSpent)} spent</span><span>${Math.round(d.percentUsed)}% used</span>
       </div>
-      <div class="progress-track" style="height:10px;background:rgba(255,255,255,0.2)">
+      <div class="progress-track" style="height:8px;background:rgba(255,255,255,0.18)">
         <div class="progress-fill" style="width:${Math.min(100,d.percentUsed)}%;background:${d.percentUsed>90?'#F87171':'#fff'}"></div>
       </div>
     </div>
-    ` : `
-    <div style="margin-top:20px;text-align:center">
-      <div style="font-size:11px;opacity:.75">Total Spent This Month</div>
-      <div class="tabular" style="font-size:30px;font-weight:700;margin-top:4px">${fmt(d.totalSpent)}</div>
-      <div style="font-size:11px;opacity:.75;margin-top:2px">${d.monthExpenses.length} expense${d.monthExpenses.length!==1?"s":""} logged</div>
+    `:`
+    <div style="margin-top:24px">
+      <div class="tabular" style="font-size:32px;font-weight:800;line-height:1.05;letter-spacing:-0.01em">${fmt(d.totalSpent)}</div>
+      <div style="font-size:12.5px;opacity:.8;margin-top:4px">Spent this month <span style="opacity:.65">· no budget set</span></div>
     </div>
     `}
   </div>
-  <div style="padding:0 20px;margin-top:-14px">
-    ${!d.hasBudget ? `
-    <div class="card row" style="padding:16px;gap:12px">
-      <div style="width:36px;height:36px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">${icon("wallet",16,PURPLE)}</div>
-      <div style="flex:1"><div style="font-size:12.5px;font-weight:600">No budget set yet</div>
-        <div class="muted" style="font-size:11px;margin-top:1px">Set one anytime to see remaining budget and a safe daily spending limit. Your expenses are already being tracked.</div></div>
-      <button class="btn-primary" style="flex-shrink:0" onclick="App.setView('budget')">Set Budget</button>
-    </div>
-    ` : (d.isCurrentMonth ? `
-    <div class="card" style="padding:16px">
-      <div class="muted" style="font-size:12px">How much can I safely spend today?</div>
-      <div class="row" style="align-items:flex-end;justify-content:space-between;margin-top:4px">
-        <div class="tabular" style="font-size:26px;font-weight:700;color:${overToday?RED:PURPLE}">${fmt(d.safeDailyLimit)}</div>
-        <div style="text-align:right;font-size:11px;color:${MUTED}">${d.daysRemaining} day${d.daysRemaining!==1?"s":""} left<br>Avg/day so far: <span class="tabular">${fmt(d.avgDailySpend)}</span></div>
-      </div>
-      ${overToday?
-        `<div class="banner" style="background:#FEF2F2;color:${RED};margin-top:12px">${icon("alert",14,RED)}<span>You spent ${fmt(d.todayTotal-d.safeDailyLimit)} more than today's recommended limit.</span></div>`:
-        `<div class="banner" style="background:#F0FDF4;color:${GREEN};margin-top:12px">${icon("check",14,GREEN)}<span>You can spend up to ${fmt(d.safeDailyLimit)} today and stay on budget.</span></div>`}
-    </div>` : "")}
-  </div>
-  <div style="padding:0 20px;margin-top:12px" class="stat-grid">
-    <div class="card" style="padding:12px"><div class="muted" style="font-size:11px">Top Category</div>
-      <div style="font-size:14px;font-weight:600;margin-top:2px" class="row">${d.categoryTotals[0]?`<span class="dot" style="width:8px;height:8px;background:${catColor(d.categoryTotals[0][0])};margin-right:6px"></span>${esc(d.categoryTotals[0][0])}`:"—"}</div>
-      ${d.categoryTotals[0]?`<div class="tabular muted" style="font-size:11px;margin-top:2px">${fmt(d.categoryTotals[0][1])}</div>`:""}
-    </div>
-    <div class="card" style="padding:12px"><div class="muted" style="font-size:11px">Vs Last Month</div>
-      <div class="row tabular" style="font-size:14px;font-weight:600;margin-top:2px;color:${d.vsLastMonth>=0?GREEN:RED}">
-        ${icon(d.vsLastMonth>=0?"down":"up",13,d.vsLastMonth>=0?GREEN:RED)}&nbsp;${fmt(Math.abs(d.vsLastMonth))} ${d.vsLastMonth>=0?"less":"more"}</div>
-    </div>
-  </div>
-  ${d.hasBudget?`
-  <div style="padding:0 20px;margin-top:12px">
-    <div class="card row" style="padding:14px;gap:12px">
-      <div style="width:36px;height:36px;border-radius:50%;background:${d.health.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <span class="dot" style="width:10px;height:10px;background:${d.health.color}"></span>
-      </div>
-      <div><div style="font-size:13px;font-weight:600;color:${d.health.color}">${d.health.label}</div>
-      <div class="muted" style="font-size:11.5px">${d.percentUsed.toFixed(0)}% of budget used${d.isCurrentMonth?`, day ${now.getDate()} of the month`:""}</div></div>
-    </div>
-  </div>`:""}
-  ${d.isCurrentMonth?`
-  <div style="padding:0 20px;margin-top:16px">
-    <div class="between" style="margin-bottom:8px">
-      <div style="font-size:14px;font-weight:700">Today — ${fmt(d.todayTotal)}</div>
-      <button onclick="App.openAdd()" style="font-size:12px;font-weight:600;color:${PURPLE}" class="row">${icon("plus",14,PURPLE)}&nbsp;Add Expense</button>
-    </div>
-    ${d.todayExpenses.length===0?`
-      <div class="card" style="padding:20px">
-        <div class="empty" style="padding:0">
-          <div class="icon-wrap">${icon("receipt",20,PURPLE)}</div>
-          <div style="font-weight:600;font-size:14px">No expenses yet</div>
-          <div class="muted" style="font-size:12.5px;margin-top:3px">Start tracking your spending by adding your first expense.</div>
-          <button class="btn-primary" style="margin-top:12px" onclick="App.openAdd()">+ Add Expense</button>
-        </div>
-      </div>`:
-      `<div class="card">${d.todayExpenses.map(e=>expenseRowHTML(e,false)).join("")}</div>`}
-  </div>`:`
-  <div style="padding:0 20px;margin-top:16px">
-    <div class="between" style="margin-bottom:8px">
-      <div style="font-size:14px;font-weight:700">${monthLabel(STATE.year,STATE.month)} — ${fmt(d.totalSpent)}</div>
-      <button onclick="App.openAdd()" style="font-size:12px;font-weight:600;color:${PURPLE}" class="row">${icon("plus",14,PURPLE)}&nbsp;Add Expense</button>
-    </div>
-    ${d.monthExpenses.length===0?`
-      <div class="card" style="padding:20px">
-        <div class="empty" style="padding:0">
-          <div class="icon-wrap">${icon("receipt",20,PURPLE)}</div>
-          <div style="font-weight:600;font-size:14px">No expenses yet</div>
-          <div class="muted" style="font-size:12.5px;margin-top:3px">Add an expense for ${monthLabel(STATE.year,STATE.month)}, or check the Expenses tab for other months.</div>
-          <button class="btn-primary" style="margin-top:12px" onclick="App.openAdd('${isoDate(STATE.year,STATE.month,1)}')">+ Add Expense</button>
-        </div>
-      </div>`:
-      `<div class="card">${[...d.monthExpenses].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5).map(e=>expenseRowHTML(e,true)).join("")}</div>
-      ${d.monthExpenses.length>5?`<button style="width:100%;font-size:12px;font-weight:600;color:${PURPLE};padding:10px 0" onclick="App.setView('expenses')">View all ${d.monthExpenses.length} expenses</button>`:""}`}
-  </div>`}
+  ${d.hasBudget ? healthSectionHTML(d) : noBudgetPromptHTML()}
+  ${(d.hasBudget && d.isCurrentMonth) ? safeToSpendHTML(d,overToday) : ""}
+  ${todaysSpendingHTML(d)}
+  ${spendingInsightsHTML(d)}
   `;
 }
 function expenseRowHTML(e,showDate){
+  const menuOpen = STATE.openRowMenu === e.id;
   return `<div class="expense-row">
     <div class="cat-icon" style="background:${catColor(e.category)}22">${icon("receipt",13,catColor(e.category))}</div>
     <div style="flex:1;min-width:0">
@@ -506,8 +580,16 @@ function expenseRowHTML(e,showDate){
       <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${showDate?formatShortDate(e.date)+" · ":""}${esc(e.category)} · ${esc(e.paymentMethod)}${e.recurring?" · Recurring":""}</div>
     </div>
     <div class="tabular" style="font-size:13px;font-weight:600;flex-shrink:0">${fmt(e.amount)}</div>
-    <button class="iconbtn" onclick="App.openEdit('${e.id}')">${icon("pencil",13,MUTED)}</button>
-    <button class="iconbtn" onclick="App.deleteExpense('${e.id}')">${icon("trash",13,RED)}</button>
+    <div class="row-menu-wrap">
+      <button class="iconbtn" onclick="App.toggleRowMenu('${e.id}')">${icon("moreVertical",16,MUTED)}</button>
+      ${menuOpen ? `
+        <div class="row-menu-backdrop" onclick="App.closeRowMenu()"></div>
+        <div class="row-menu">
+          <button onclick="App.editFromRowMenu('${e.id}')">${icon("pencil",14,INK)} Edit</button>
+          <button class="danger" onclick="App.deleteFromRowMenu('${e.id}')">${icon("trash",14,RED)} Delete</button>
+        </div>
+      ` : ""}
+    </div>
   </div>`;
 }
 function monthNavHTML(){
@@ -976,18 +1058,20 @@ function confirmDialogHTML(){
 
 /* ============================== actions ============================== */
 const App = {
-  setView(v){ STATE.view=v; STATE.calendarDay=null; update(); },
-  prevMonth(){ const dt=new Date(STATE.year,STATE.month-1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; update(); },
-  nextMonth(){ const dt=new Date(STATE.year,STATE.month+1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; update(); },
+  setView(v){ STATE.view=v; STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update(); },
+  prevMonth(){ const dt=new Date(STATE.year,STATE.month-1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update(); },
+  nextMonth(){ const dt=new Date(STATE.year,STATE.month+1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update(); },
   setMonthDropdown(value){
     const [y,m]=value.split("-").map(Number);
-    STATE.year=y; STATE.month=m; STATE.calendarDay=null; update();
+    STATE.year=y; STATE.month=m; STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update();
   },
-  toggleCalendarDay(dd){ STATE.calendarDay = STATE.calendarDay===dd? null: dd; render(); },
+  toggleSafeInfo(){ STATE.showSafeInfo=!STATE.showSafeInfo; render(); },
+  toggleCalendarDay(dd){ STATE.calendarDay = STATE.calendarDay===dd? null: dd; STATE.openRowMenu=null; render(); },
   setTrendMode(m){ STATE.trendMode=m; render(); },
-  setHistoryFilter(k,v){ STATE.historyFilters[k]=v; update(); },
+  setHistoryFilter(k,v){ STATE.historyFilters[k]=v; STATE.openRowMenu=null; update(); },
 
   openAdd(dateOverride){
+    STATE.openRowMenu=null;
     STATE.modal={id:null, amount:"", category:"", date:dateOverride||todayISO(), paymentMethod:"", description:""};
     render();
   },
@@ -995,6 +1079,10 @@ const App = {
     const e=STATE.expenses.find(x=>x.id===id); if(!e) return;
     STATE.modal={...e}; render();
   },
+  toggleRowMenu(id){ STATE.openRowMenu = STATE.openRowMenu===id ? null : id; render(); },
+  closeRowMenu(){ STATE.openRowMenu=null; render(); },
+  editFromRowMenu(id){ STATE.openRowMenu=null; App.openEdit(id); },
+  deleteFromRowMenu(id){ STATE.openRowMenu=null; App.deleteExpense(id); },
   closeModal(e){ if(e && e.target!==e.currentTarget) return; STATE.modal=null; render(); },
   syncModalDraftFromDOM(){
     if(!STATE.modal) return;
@@ -1060,7 +1148,7 @@ const App = {
   },
   deleteExpense(id){
     STATE.confirm={message:"Delete this expense? This can't be undone.", danger:true, confirmLabel:"Delete",
-      action:()=>{ STATE.expenses=STATE.expenses.filter(e=>e.id!==id); saveExpenses(); trackEvent("expense_deleted"); }};
+      action:()=>{ STATE.expenses=STATE.expenses.filter(e=>e.id!==id); saveExpenses(); trackEvent("expense_deleted"); showToast("Expense deleted"); }};
     render();
   },
   saveBudget(v){ STATE.settings.monthlyBudget=parseFloat(v)||0; saveSettings(); update(); },
