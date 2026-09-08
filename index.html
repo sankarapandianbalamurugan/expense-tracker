@@ -69,10 +69,10 @@
   .cat-icon{width:34px;height:34px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .iconbtn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:var(--radius-sm);}
   .iconbtn:hover{background:var(--surface-2);}
-  input[type=text],input[type=number],input[type=date],select{
+  input[type=text],input[type=number],input[type=date],input[type=password],input[type=tel],select{
     width:100%;background:#fff;border:1px solid var(--line-strong);border-radius:var(--radius-md);padding:12px 14px;font-size:14px;outline:none;color:var(--ink);transition:border-color .15s var(--ease), box-shadow .15s var(--ease);
   }
-  input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,select:focus{border-color:var(--purple);box-shadow:0 0 0 3px var(--purple-tint);}
+  input[type=text]:focus,input[type=number]:focus,input[type=date]:focus,input[type=password]:focus,input[type=tel]:focus,select:focus{border-color:var(--purple);box-shadow:0 0 0 3px var(--purple-tint);}
   .bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--line);
     display:flex;align-items:center;justify-content:space-between;padding:8px 8px calc(10px + env(safe-area-inset-bottom));z-index:40;}
   .navitem{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;font-size:9.5px;font-weight:600;transition:color .15s var(--ease);}
@@ -114,6 +114,15 @@
   .row-menu button:hover{background:var(--surface-2);}
   .row-menu button.danger{color:var(--red);}
   .kicker{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .switch{position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;position:absolute;}
+  .switch .track{position:absolute;inset:0;background:var(--line-strong);border-radius:99px;transition:background-color .18s var(--ease);cursor:pointer;}
+  .switch .track::before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;
+    box-shadow:0 1px 3px rgba(0,0,0,0.25);transition:transform .18s var(--ease);}
+  .switch input:checked + .track{background:var(--purple);}
+  .switch input:checked + .track::before{transform:translateX(18px);}
+  .otp-row{display:flex;gap:10px;justify-content:center;}
+  input.otp-box{width:50px;height:56px;text-align:center;font-size:22px;font-weight:700;padding:0;}
   .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);max-width:calc(480px - 40px);
     background:#1F2024;color:#fff;font-size:13px;font-weight:500;padding:12px 16px;border-radius:var(--radius-md);
     box-shadow:0 8px 24px rgba(0,0,0,0.25);z-index:70;display:flex;align-items:center;gap:8px;white-space:nowrap;
@@ -135,6 +144,62 @@ const CATEGORIES=[
 const PAYMENT_METHODS=["Cash","UPI","Debit Card","Credit Card","Other"];
 const WEEKDAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const LS_EXPENSES="bt_expenses_v1", LS_SETTINGS="bt_settings_v1";
+const LS_SECURITY="bt_security_v1", LS_SECURE_DATA="bt_secure_v1";
+
+/* ============================== crypto / PIN security ============================== */
+// PIN is NEVER stored. Only a random salt + PBKDF2 iteration count are stored (both non-secret).
+// The PIN derives an AES-GCM key each time; a wrong PIN simply fails to decrypt (GCM auth tag
+// mismatch) — this doubles as PIN verification, so there is no separate "PIN hash" to steal.
+let CRYPTO_KEY = null; // in-memory only for the unlocked session, never persisted
+let persistTimer = null;
+
+function randomBytes(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return a; }
+function b64encode(bytes){ let s=""; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); }
+function b64decode(str){ const bin=atob(str); const out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+
+async function deriveKey(pin, saltB64, iterations){
+  const salt = b64decode(saltB64);
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pin), {name:"PBKDF2"}, false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {name:"PBKDF2", salt, iterations, hash:"SHA-256"},
+    keyMaterial, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]
+  );
+}
+async function encryptJSON(key, obj){
+  const iv = randomBytes(12);
+  const enc = new TextEncoder();
+  const data = enc.encode(JSON.stringify(obj));
+  const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, data);
+  return { iv: b64encode(iv), ciphertext: b64encode(new Uint8Array(cipherBuf)) };
+}
+async function decryptJSON(key, blob){
+  const iv = b64decode(blob.iv);
+  const cipherBytes = b64decode(blob.ciphertext);
+  const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, cipherBytes); // throws on wrong key
+  const dec = new TextDecoder();
+  return JSON.parse(dec.decode(plainBuf));
+}
+
+function loadSecurityMeta(){
+  try{ const raw=localStorage.getItem(LS_SECURITY); return raw? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function saveSecurityMeta(meta){ try{ localStorage.setItem(LS_SECURITY, JSON.stringify(meta)); }catch(e){} }
+function securityEnabled(){ const m=loadSecurityMeta(); return !!(m && m.enabled); }
+function defaultSecurityMeta(){
+  return { enabled:false, salt:null, iterations:150000, autoLockMinutes:5, failedAttempts:0, lockoutUntil:null, lockoutStrikes:0 };
+}
+function isLockedOut(meta){ return !!(meta && meta.lockoutUntil && meta.lockoutUntil > Date.now()); }
+
+function schedulePersistEncrypted(){
+  if(persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => { persistEncryptedNow().catch(()=>{}); }, 120);
+}
+async function persistEncryptedNow(){
+  if(!CRYPTO_KEY) return;
+  const blob = await encryptJSON(CRYPTO_KEY, { expenses: STATE.expenses, settings: STATE.settings });
+  try{ localStorage.setItem(LS_SECURE_DATA, JSON.stringify(blob)); }catch(e){}
+}
 const now=new Date();
 
 /* ---- Analytics: fires anonymous, no-payload events only. Never blocks the app if GA is unavailable. ---- */
@@ -264,8 +329,10 @@ const ICONS={
   upload:'<path d="M12 21V9m0 0 4 4m-4-4-4 4"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
   undo:'<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/>',
   moreVertical:'<circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/>',
+  moreHorizontal:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   info:'<circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><circle cx="12" cy="8" r="0.9" fill="currentColor" stroke="none"/>',
-  chevDown:'<path d="m6 9 6 6 6-6"/>'
+  chevDown:'<path d="m6 9 6 6 6-6"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
 };
 function icon(name,size=16,color="currentColor",cls=""){
   return `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:${color}">${ICONS[name]||""}</svg>`;
@@ -277,7 +344,8 @@ let STATE={
   year:now.getFullYear(), month:now.getMonth(),
   view:"dashboard", modal:null, confirm:null, budgetShowAllCategories:false, openRowMenu:null, toast:null, showSafeInfo:false,
   calendarDay:null, trendMode:"daily",
-  historyFilters:{search:"",category:"All",payment:"All",sort:"newest",groupBy:"date"}
+  historyFilters:{search:"",category:"All",payment:"All",sort:"newest",groupBy:"date"},
+  locked:false, booted:false, pinFlow:null, pinDraft:"", pinError:"", lockoutTick:0
 };
 
 function load(){
@@ -295,10 +363,17 @@ function load(){
     STATE.settings=blankSettings();
   }
 }
-function saveExpenses(){ try{localStorage.setItem(LS_EXPENSES,JSON.stringify(STATE.expenses));}catch(e){} }
-function saveSettings(){ try{localStorage.setItem(LS_SETTINGS,JSON.stringify(STATE.settings));}catch(e){} }
+function saveExpenses(){
+  if(securityEnabled() && CRYPTO_KEY){ schedulePersistEncrypted(); return; }
+  try{localStorage.setItem(LS_EXPENSES,JSON.stringify(STATE.expenses));}catch(e){}
+}
+function saveSettings(){
+  if(securityEnabled() && CRYPTO_KEY){ schedulePersistEncrypted(); return; }
+  try{localStorage.setItem(LS_SETTINGS,JSON.stringify(STATE.settings));}catch(e){}
+}
 
 function applyRecurringIfNeeded(){
+  if(STATE.locked || !STATE.settings) return;
   const key=`${STATE.year}-${STATE.month}`;
   if(STATE.settings.appliedRecurringMonths.includes(key)) return;
   const items=STATE.settings.recurring.filter(r=>r.frequency==="Monthly");
@@ -360,6 +435,13 @@ function update(fn){
     if(el){el.focus();if(selStart!==null&&el.setSelectionRange){try{el.setSelectionRange(selStart,selEnd);}catch(e){}}}}
 }
 function render(){
+  if(STATE.locked){
+    document.getElementById("root").innerHTML = lockScreenHTML();
+    document.querySelectorAll("body > .overlay").forEach(el => el.remove());
+    document.querySelectorAll("body > .toast").forEach(el => el.remove());
+    focusOtpGroup("unlock"); // autofocus attribute is unreliable on innerHTML-injected content
+    return;
+  }
   const d=deriveMonth();
   const NAV=[["dashboard","Dashboard","home"],["expenses","Expenses","receipt"],["analytics","Analytics","pie"]];
   const MORE=[["calendar","Calendar","cal"],["budget","Budget","wallet"],["reports","Monthly Reports","bar"],["settings","Settings","gear"]];
@@ -391,7 +473,7 @@ function render(){
       ${NAV.slice(0,2).map(n=>navItemHTML(n,STATE.view===n[0])).join("")}
       <button class="addbtn" onclick="App.openAdd()">${icon("plus",22,"#fff")}</button>
       ${NAV.slice(2).map(n=>navItemHTML(n,STATE.view===n[0])).join("")}
-      ${navItemHTML(["more","More","gear"],moreActive)}
+      ${navItemHTML(["more","More","moreHorizontal"],moreActive)}
     </div>
   `;
   document.getElementById("root").innerHTML = html;
@@ -404,9 +486,81 @@ function render(){
   if(STATE.modal){ document.body.insertAdjacentHTML("beforeend", expenseModalHTML(d)); }
   if(STATE.confirm){ document.body.insertAdjacentHTML("beforeend", confirmDialogHTML()); }
   if(STATE.toast){ document.body.insertAdjacentHTML("beforeend", toastHTML()); }
+  if(STATE.pinFlow){
+    document.body.insertAdjacentHTML("beforeend", pinFlowModalHTML());
+    focusOtpGroup(STATE.pinFlow.step==="verify" ? "verify" : "new");
+  }
 }
 function toastHTML(){
   return `<div class="toast">${icon("check",14,"#fff")}<span>${esc(STATE.toast.message)}</span></div>`;
+}
+function otpRowHTML(groupId, autofocusFirst){
+  let boxes = "";
+  for(let i=0;i<4;i++){
+    boxes += `<input class="otp-box" type="password" inputmode="numeric" pattern="[0-9]" maxlength="1" autocomplete="off"
+      data-group="${groupId}" data-idx="${i}" ${autofocusFirst && i===0 ? "autofocus":""}
+      oninput="App.onOtpInput(this)" onkeydown="App.onOtpKeydown(event,this)">`;
+  }
+  return `<div class="otp-row" data-otp-group="${groupId}">${boxes}</div>`;
+}
+function readOtpGroup(groupId){
+  const boxes = [...document.querySelectorAll(`.otp-box[data-group="${groupId}"]`)];
+  return boxes.map(b=>b.value).join("");
+}
+function focusOtpGroup(groupId){
+  const first = document.querySelector(`.otp-box[data-group="${groupId}"][data-idx="0"]`);
+  if(first) first.focus();
+}
+function lockScreenHTML(){
+  const meta = loadSecurityMeta();
+  const lockedOut = isLockedOut(meta);
+  const remaining = lockedOut ? Math.max(0, Math.ceil((meta.lockoutUntil-Date.now())/1000)) : 0;
+  return `
+  <div style="min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;background:var(--bg);max-width:480px;margin:0 auto">
+    <div style="width:64px;height:64px;border-radius:50%;background:${PURPLE}1A;display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+      ${icon("lock",26,PURPLE)}
+    </div>
+    <div style="font-size:17px;font-weight:700;letter-spacing:-0.01em">Expense Tracker</div>
+    <div class="muted" style="font-size:13px;margin-top:4px">${lockedOut?"Too many incorrect attempts":"Enter your 4-digit PIN"}</div>
+    <div style="margin-top:26px;width:100%;max-width:270px">
+      ${lockedOut?`
+        <div class="muted" style="font-size:12.5px;line-height:1.6">Try again in <span class="tabular" style="font-weight:700;color:${RED}">${remaining}</span> second${remaining!==1?"s":""}.</div>
+      `:`
+        ${otpRowHTML("unlock", true)}
+        ${STATE.pinError?`<div style="font-size:12px;color:${RED};margin-top:12px">${esc(STATE.pinError)}</div>`:""}
+        <button class="btn-primary" style="width:100%;margin-top:18px" onclick="App.submitUnlockFromButton()">Unlock</button>
+      `}
+    </div>
+  </div>`;
+}
+function pinFlowModalHTML(){
+  const f = STATE.pinFlow;
+  if(f.step==="verify"){
+    const subtitle = f.mode==="disable" ? "This turns off App Lock and PIN protection." : "We'll verify this before setting a new one.";
+    return `<div class="overlay center" onclick="App.cancelPinFlow(event)">
+      <div class="dialog" onclick="event.stopPropagation()" style="text-align:center">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">Enter your current PIN</div>
+        <div class="muted" style="font-size:12px;margin-bottom:18px">${subtitle}</div>
+        ${otpRowHTML("verify", true)}
+        ${f.error?`<div style="font-size:12px;color:${RED};margin-top:12px">${esc(f.error)}</div>`:""}
+        <button class="btn-outline" style="width:100%;margin-top:18px" onclick="App.cancelPinFlow()">Cancel</button>
+      </div>
+    </div>`;
+  }
+  const heading = f.mode==="change" ? "Create new 4-digit PIN" : "Create your 4-digit PIN";
+  const confirmHeading = f.mode==="change" ? "Confirm new PIN" : "Confirm your PIN";
+  const buttonLabel = f.mode==="change" ? "Change PIN" : "Create PIN";
+  return `<div class="overlay center" onclick="App.cancelPinFlow(event)">
+    <div class="dialog" onclick="event.stopPropagation()" style="text-align:center">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px">${heading}</div>
+      ${otpRowHTML("new", true)}
+      <div style="font-size:14px;font-weight:700;margin:20px 0 10px">${confirmHeading}</div>
+      ${otpRowHTML("confirm", false)}
+      ${f.error?`<div style="font-size:12px;color:${RED};margin-top:12px">${esc(f.error)}</div>`:""}
+      <button class="btn-primary" style="width:100%;margin-top:18px" onclick="App.submitCombinedPin()">${buttonLabel}</button>
+      <button class="btn-outline" style="width:100%;margin-top:8px" onclick="App.cancelPinFlow()">Cancel</button>
+    </div>
+  </div>`;
 }
 function navItemHTML(n,active){
   return `<button class="navitem" style="color:${active?PURPLE:MUTED}" onclick="App.setView('${n[0]}')">
@@ -947,6 +1101,35 @@ function summaryStat(label,value,span){
 }
 
 /* ============================== settings ============================== */
+function securitySectionHTML(){
+  const meta = loadSecurityMeta();
+  const enabled = !!(meta && meta.enabled);
+  return `<div class="card" style="padding:16px">
+    <div class="section-title" style="margin-bottom:2px">Security</div>
+    <div class="muted" style="font-size:11px;margin-bottom:14px">Your PIN is never stored — it's only used to encrypt your data on this device.</div>
+    <div class="between">
+      <div style="font-size:13px;font-weight:600">App Lock</div>
+      <label class="switch">
+        <input type="checkbox" ${enabled?"checked":""} onchange="App.onAppLockToggle(this.checked)">
+        <span class="track"></span>
+      </label>
+    </div>
+    ${enabled?`
+      <div style="height:1px;background:var(--line);margin:14px 0"></div>
+      <button class="btn-outline" style="width:100%;margin-bottom:10px" onclick="App.startChangePin()">Change PIN</button>
+      <div style="margin-bottom:12px">
+        <label class="muted" style="font-size:11px;font-weight:500">Auto Lock</label>
+        <select style="margin-top:4px" onchange="App.setAutoLock(this.value)">
+          <option value="0" ${meta.autoLockMinutes===0?"selected":""}>Immediately</option>
+          <option value="1" ${meta.autoLockMinutes===1?"selected":""}>After 1 minute</option>
+          <option value="5" ${meta.autoLockMinutes===5?"selected":""}>After 5 minutes</option>
+          <option value="15" ${meta.autoLockMinutes===15?"selected":""}>After 15 minutes</option>
+        </select>
+      </div>
+      <button class="row" style="width:100%;justify-content:center;gap:7px;color:${RED};font-weight:600;font-size:13px;padding:10px 14px;border-radius:12px;background:${RED}0D" onclick="App.lockNow()">${icon("lock",14,RED)} Lock Now</button>
+    `:""}
+  </div>`;
+}
 function renderSettings(){
   return `
   <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
@@ -955,6 +1138,7 @@ function renderSettings(){
       <div style="font-size:14px;font-weight:600;margin-top:4px">Indian Rupee (\u20B9)</div>
       <div class="muted" style="font-size:11px;margin-top:4px">This tracker only stores what you enter manually — no bank, UPI, or card accounts are ever connected. Your data lives only on this device.</div>
     </div>
+    ${securitySectionHTML()}
     <div class="card" style="padding:16px">
       <div class="section-title">Your Data</div>
       <button class="btn-primary" style="width:100%;margin-bottom:8px" onclick="App.exportData()">${icon("download",14,"#fff")} Export as JSON</button>
@@ -1241,14 +1425,254 @@ const App = {
     render();
   },
   cancelConfirm(e){ if(e && e.target!==e.currentTarget) return; STATE.confirm=null; render(); },
-  confirmYes(){ const c=STATE.confirm; STATE.confirm=null; if(c && c.action) c.action(); update(); }
+  confirmYes(){ const c=STATE.confirm; STATE.confirm=null; if(c && c.action) c.action(); update(); },
+
+  /* ---- Security: OTP-box input handling (shared by unlock, verify, create/confirm) ---- */
+  onOtpInput(el){
+    el.value = el.value.replace(/\D/g,"").slice(0,1);
+    const group = el.dataset.group;
+    const idx = Number(el.dataset.idx);
+    if(el.value && idx<3){
+      const next = document.querySelector(`.otp-box[data-group="${group}"][data-idx="${idx+1}"]`);
+      if(next) next.focus();
+    }
+    App.onOtpGroupChanged(group);
+  },
+  onOtpKeydown(e, el){
+    if(e.key==="Backspace" && !el.value){
+      const group = el.dataset.group;
+      const idx = Number(el.dataset.idx);
+      if(idx>0){
+        const prev = document.querySelector(`.otp-box[data-group="${group}"][data-idx="${idx-1}"]`);
+        if(prev) prev.focus();
+      }
+    }
+  },
+  onOtpGroupChanged(group){
+    const value = readOtpGroup(group);
+    if(value.length<4) return;
+    if(group==="unlock"){ App.attemptUnlock(value); return; }
+    if(group==="verify"){ App.submitVerifyStep(value); return; }
+    if(group==="new"){ focusOtpGroup("confirm"); return; }
+    if(group==="confirm"){ App.submitCombinedPin(); return; }
+  },
+
+  /* ---- Security: unlock ---- */
+  submitUnlockFromButton(){
+    const v = readOtpGroup("unlock");
+    if(v.length===4){ App.attemptUnlock(v); }
+  },
+  async attemptUnlock(pin){
+    const meta = loadSecurityMeta();
+    if(!meta || !meta.enabled){ STATE.locked=false; render(); return; }
+    if(isLockedOut(meta)){ render(); return; }
+    try{
+      const key = await deriveKey(pin, meta.salt, meta.iterations);
+      const raw = localStorage.getItem(LS_SECURE_DATA);
+      if(!raw) throw new Error("no secure data");
+      const blob = JSON.parse(raw);
+      const data = await decryptJSON(key, blob);
+      STATE.expenses = data.expenses || [];
+      STATE.settings = data.settings || blankSettings();
+      CRYPTO_KEY = key;
+      STATE.locked = false;
+      STATE.pinError = "";
+      meta.failedAttempts = 0; meta.lockoutUntil = null; meta.lockoutStrikes = 0;
+      saveSecurityMeta(meta);
+      applyRecurringIfNeeded();
+      resetActivityTracking();
+      render();
+      trackEvent("app_opened");
+    }catch(err){
+      meta.failedAttempts = (meta.failedAttempts||0) + 1;
+      if(meta.failedAttempts >= 5){
+        meta.lockoutStrikes = (meta.lockoutStrikes||0) + 1;
+        const seconds = Math.min(30 * Math.pow(2, meta.lockoutStrikes-1), 300);
+        meta.lockoutUntil = Date.now() + seconds*1000;
+        meta.failedAttempts = 0;
+      }
+      saveSecurityMeta(meta);
+      STATE.pinError = "Incorrect PIN. Please try again.";
+      render();
+      startLockoutTickerIfNeeded();
+    }
+  },
+  lockNow(){
+    if(!securityEnabled()) return;
+    if(persistTimer){ clearTimeout(persistTimer); persistEncryptedNow().catch(()=>{}); }
+    STATE.locked = true;
+    STATE.expenses = [];
+    STATE.settings = null;
+    STATE.modal=null; STATE.confirm=null; STATE.openRowMenu=null; STATE.pinFlow=null;
+    CRYPTO_KEY = null;
+    STATE.pinError = "";
+    render();
+  },
+
+  /* ---- Security: create / change / disable PIN ---- */
+  startCreatePin(){ STATE.pinFlow={mode:"create",step:"enter",error:""}; render(); },
+  startChangePin(){ STATE.pinFlow={mode:"change",step:"verify",error:""}; render(); },
+  startDisableLock(){ STATE.pinFlow={mode:"disable",step:"verify",error:""}; render(); },
+  cancelPinFlow(e){ if(e && e.target!==e.currentTarget) return; STATE.pinFlow=null; render(); },
+  onAppLockToggle(checked){ if(checked){ App.startCreatePin(); } else { App.startDisableLock(); } },
+  async submitVerifyStep(value){
+    const f = STATE.pinFlow; if(!f) return;
+    const meta = loadSecurityMeta();
+    try{
+      const key = await deriveKey(value, meta.salt, meta.iterations);
+      const raw = localStorage.getItem(LS_SECURE_DATA);
+      const blob = JSON.parse(raw);
+      await decryptJSON(key, blob);
+      if(f.mode==="disable"){ await App.finishDisableLock(); return; }
+      f.step="enter"; f.error=""; render();
+    }catch(err){
+      f.error="Incorrect PIN. Please try again."; render();
+    }
+  },
+  async submitCombinedPin(){
+    const f = STATE.pinFlow; if(!f) return;
+    const newPin = readOtpGroup("new");
+    const confirmPin = readOtpGroup("confirm");
+    if(newPin.length!==4 || confirmPin.length!==4) return;
+    if(newPin!==confirmPin){
+      f.error="PINs don't match. Try again."; render(); return;
+    }
+    if(f.mode==="create"){ await App.finishCreatePin(newPin); }
+    else if(f.mode==="change"){ await App.finishChangePin(newPin); }
+  },
+  async finishCreatePin(pin){
+    try{
+      const salt = b64encode(randomBytes(16));
+      const iterations = 150000;
+      const key = await deriveKey(pin, salt, iterations);
+      await persistEncryptedWithKey(key);
+      CRYPTO_KEY = key;
+      const meta = defaultSecurityMeta();
+      meta.enabled = true; meta.salt = salt; meta.iterations = iterations;
+      saveSecurityMeta(meta);
+      try{ localStorage.removeItem(LS_EXPENSES); localStorage.removeItem(LS_SETTINGS); }catch(e){}
+      STATE.pinFlow=null;
+      resetActivityTracking();
+      showToast("PIN created successfully.");
+    }catch(err){
+      STATE.pinFlow.error = "Couldn't set up PIN protection on this device. Nothing has changed.";
+      render();
+    }
+  },
+  async finishChangePin(newPin){
+    try{
+      const salt = b64encode(randomBytes(16));
+      const iterations = 150000;
+      const newKey = await deriveKey(newPin, salt, iterations);
+      await persistEncryptedWithKey(newKey);
+      CRYPTO_KEY = newKey;
+      const meta = loadSecurityMeta() || defaultSecurityMeta();
+      meta.enabled = true; meta.salt = salt; meta.iterations = iterations;
+      meta.failedAttempts=0; meta.lockoutUntil=null; meta.lockoutStrikes=0;
+      saveSecurityMeta(meta);
+      STATE.pinFlow=null;
+      showToast("PIN changed successfully.");
+    }catch(err){
+      STATE.pinFlow.error = "Couldn't change your PIN. Please try again.";
+      render();
+    }
+  },
+  async finishDisableLock(){
+    try{
+      localStorage.setItem(LS_EXPENSES, JSON.stringify(STATE.expenses));
+      localStorage.setItem(LS_SETTINGS, JSON.stringify(STATE.settings));
+      try{ localStorage.removeItem(LS_SECURE_DATA); }catch(e){}
+      const meta = defaultSecurityMeta();
+      saveSecurityMeta(meta);
+      CRYPTO_KEY = null;
+      if(autoLockInterval){ clearInterval(autoLockInterval); autoLockInterval=null; }
+      STATE.pinFlow=null;
+      showToast("App Lock turned off.");
+    }catch(err){
+      STATE.pinFlow.error = "Couldn't turn off App Lock. Please try again.";
+      render();
+    }
+  },
+  setAutoLock(minutes){
+    const meta = loadSecurityMeta(); if(!meta) return;
+    meta.autoLockMinutes = Number(minutes);
+    saveSecurityMeta(meta);
+    resetActivityTracking();
+    render();
+  }
 };
 
+async function persistEncryptedWithKey(key){
+  const blob = await encryptJSON(key, { expenses: STATE.expenses, settings: STATE.settings });
+  localStorage.setItem(LS_SECURE_DATA, JSON.stringify(blob));
+}
+
+/* ---- lockout countdown ticker ---- */
+let lockoutInterval = null;
+function startLockoutTickerIfNeeded(){
+  const meta = loadSecurityMeta();
+  if(!isLockedOut(meta) || lockoutInterval) return;
+  lockoutInterval = setInterval(() => {
+    const m = loadSecurityMeta();
+    if(!isLockedOut(m)){ clearInterval(lockoutInterval); lockoutInterval=null; }
+    if(STATE.locked) render();
+  }, 1000);
+}
+
+/* ---- auto-lock / inactivity tracking ---- */
+let lastActivity = Date.now();
+let hiddenAt = null;
+let autoLockInterval = null;
+function markActivity(){ lastActivity = Date.now(); }
+function resetActivityTracking(){
+  lastActivity = Date.now();
+  hiddenAt = null;
+  if(autoLockInterval){ clearInterval(autoLockInterval); autoLockInterval=null; }
+  const meta = loadSecurityMeta();
+  if(meta && meta.enabled && meta.autoLockMinutes>0){
+    autoLockInterval = setInterval(() => {
+      if(STATE.locked) return;
+      if(Date.now()-lastActivity >= meta.autoLockMinutes*60000){ App.lockNow(); }
+    }, 10000);
+  }
+}
+if(typeof document !== "undefined"){
+  document.addEventListener("click", markActivity);
+  document.addEventListener("keydown", markActivity);
+  document.addEventListener("touchstart", markActivity);
+  document.addEventListener("visibilitychange", () => {
+    if(STATE.locked) return;
+    const meta = loadSecurityMeta();
+    if(!meta || !meta.enabled) return;
+    if(document.hidden){
+      hiddenAt = Date.now();
+    } else if(hiddenAt){
+      const elapsed = Date.now()-hiddenAt;
+      hiddenAt = null;
+      if(meta.autoLockMinutes===0 || elapsed >= meta.autoLockMinutes*60000){ App.lockNow(); }
+      else { markActivity(); }
+    }
+  });
+}
+
+
 /* ============================== boot ============================== */
-load();
-applyRecurringIfNeeded();
-render();
-trackEvent("app_opened");
+function boot(){
+  const meta = loadSecurityMeta();
+  if(meta && meta.enabled){
+    STATE.locked = true;
+    render();
+    if(isLockedOut(meta)) startLockoutTickerIfNeeded();
+  } else {
+    load();
+    applyRecurringIfNeeded();
+    STATE.locked = false;
+    render();
+    trackEvent("app_opened");
+    resetActivityTracking();
+  }
+}
+boot();
 </script>
 </body>
 </html>
