@@ -1080,10 +1080,18 @@ function renderAnalytics(d){
           ${["daily","weekly","monthly"].map(m=>`<button class="${STATE.trendMode===m?'active':''}" style="padding:5px 10px;text-transform:capitalize" onclick="App.setTrendMode('${m}')">${m}</button>`).join("")}
         </div>
       </div>
-      <div class="card" style="padding:12px 8px;height:150px;display:flex;align-items:flex-end;gap:${STATE.trendMode==='daily'?'2px':'6px'}">
-        ${trend.map(t=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
-          <div style="width:100%;max-width:22px;border-radius:4px 4px 0 0;background:${PURPLE};height:${Math.max(2,t.value/maxTrend*100)}%"></div>
-        </div>`).join("")}
+      <div class="card" style="padding:12px 8px 10px">
+        <div style="height:130px;display:flex;align-items:flex-end;gap:${STATE.trendMode==='daily'?'2px':'6px'}">
+          ${trend.map(t=>`<div style="flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center">
+            <div style="width:100%;max-width:22px;border-radius:4px 4px 0 0;background:${PURPLE};height:${Math.max(2,t.value/maxTrend*100)}%"></div>
+          </div>`).join("")}
+        </div>
+        <div style="display:flex;gap:${STATE.trendMode==='daily'?'2px':'6px'};margin-top:6px">
+          ${trend.map((t,i)=>{
+            const showLabel = STATE.trendMode!=="daily" || i===0 || i===trend.length-1 || (i+1)%5===0;
+            return `<div class="muted tabular" style="flex:1;text-align:center;font-size:8.5px;overflow:hidden;white-space:nowrap">${showLabel?esc(t.label):""}</div>`;
+          }).join("")}
+        </div>
       </div>
     </div>
   </div>`;
