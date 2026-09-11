@@ -353,7 +353,7 @@ let STATE={
   view:"dashboard", modal:null, confirm:null, budgetShowAllCategories:false, openRowMenu:null, toast:null, showSafeInfo:false,
   calendarDay:null, trendMode:"daily",
   historyFilters:{search:"",category:"All",payment:"All",sort:"newest",groupBy:"date"},
-  locked:false, booted:false, pinFlow:null, pinDraft:"", pinError:"", lockoutTick:0, openFilterSheet:null
+  locked:false, booted:false, pinFlow:null, pinDraft:"", pinError:"", lockoutTick:0, openFilterSheet:null, trendSelectedIndex:null
 };
 
 function load(){
@@ -1040,12 +1040,15 @@ function renderAnalytics(d){
   cats.forEach(([name,amt])=>{const pct=total?amt/total*100:0; const start=acc; acc+=pct; gradientStops+=`${catColor(name)} ${start}% ${acc}%,`;});
   gradientStops = gradientStops.slice(0,-1) || "#eee 0% 100%";
   let trend=[];
-  if(STATE.trendMode==="daily") trend=d.dailyTotals.map((v,i)=>({label:`${i+1}`,value:v}));
-  else if(STATE.trendMode==="weekly"){ for(let i=0;i<d.dim;i+=7) trend.push({label:`W${Math.floor(i/7)+1}`,value:d.dailyTotals.slice(i,i+7).reduce((s,v)=>s+v,0)}); }
+  if(STATE.trendMode==="daily") trend=d.dailyTotals.map((v,i)=>({label:`${i+1}`,value:v,fullLabel:`${monthShort(STATE.year,STATE.month)} ${i+1}`}));
+  else if(STATE.trendMode==="weekly"){ for(let i=0;i<d.dim;i+=7){ const start=i+1, end=Math.min(i+7,d.dim);
+      trend.push({label:`W${Math.floor(i/7)+1}`,value:d.dailyTotals.slice(i,i+7).reduce((s,v)=>s+v,0),fullLabel:`${monthShort(STATE.year,STATE.month)} ${start}\u2013${end}`}); } }
   else { for(let i=5;i>=0;i--){ const dt=new Date(STATE.year,STATE.month-i,1);
       const t=STATE.expenses.filter(e=>{const ed=new Date(e.date+"T00:00:00");return ed.getFullYear()===dt.getFullYear()&&ed.getMonth()===dt.getMonth();}).reduce((s,e)=>s+e.amount,0);
-      trend.push({label:monthShort(dt.getFullYear(),dt.getMonth()),value:t}); } }
+      trend.push({label:monthShort(dt.getFullYear(),dt.getMonth()),value:t,fullLabel:monthLabel(dt.getFullYear(),dt.getMonth())}); } }
   const maxTrend=Math.max(1,...trend.map(t=>t.value));
+  const sel = STATE.trendSelectedIndex;
+  const selPoint = (sel!==null && trend[sel]) ? trend[sel] : null;
 
   return `
   <div style="padding:20px">
@@ -1081,10 +1084,13 @@ function renderAnalytics(d){
         </div>
       </div>
       <div class="card" style="padding:12px 8px 10px">
+        <div style="min-height:20px;margin-bottom:${selPoint?'8px':'0'};text-align:center">
+          ${selPoint?`<span style="font-size:12px;font-weight:600">${esc(selPoint.fullLabel)}</span> <span class="tabular" style="font-size:12px;font-weight:700;color:${PURPLE}">${fmt(selPoint.value)}</span>`:`<span class="muted" style="font-size:11px">Tap a bar to see the amount</span>`}
+        </div>
         <div style="height:130px;display:flex;align-items:flex-end;gap:${STATE.trendMode==='daily'?'2px':'6px'}">
-          ${trend.map(t=>`<div style="flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center">
-            <div style="width:100%;max-width:22px;border-radius:4px 4px 0 0;background:${PURPLE};height:${Math.max(2,t.value/maxTrend*100)}%"></div>
-          </div>`).join("")}
+          ${trend.map((t,i)=>`<button onclick="App.selectTrendPoint(${i})" style="flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;padding:0;background:none;border:none">
+            <div style="width:100%;max-width:22px;border-radius:4px 4px 0 0;background:${i===sel?PURPLE_DARK:PURPLE};opacity:${sel!==null && i!==sel?0.35:1};height:${Math.max(2,t.value/maxTrend*100)}%;transition:opacity .15s var(--ease), background-color .15s var(--ease)"></div>
+          </button>`).join("")}
         </div>
         <div style="display:flex;gap:${STATE.trendMode==='daily'?'2px':'6px'};margin-top:6px">
           ${trend.map((t,i)=>{
@@ -1291,16 +1297,17 @@ function confirmDialogHTML(){
 
 /* ============================== actions ============================== */
 const App = {
-  setView(v){ STATE.view=v; STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; STATE.openFilterSheet=null; update(); },
-  prevMonth(){ const dt=new Date(STATE.year,STATE.month-1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update(); },
-  nextMonth(){ const dt=new Date(STATE.year,STATE.month+1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update(); },
+  setView(v){ STATE.view=v; STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; STATE.openFilterSheet=null; STATE.trendSelectedIndex=null; update(); },
+  prevMonth(){ const dt=new Date(STATE.year,STATE.month-1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; STATE.trendSelectedIndex=null; update(); },
+  nextMonth(){ const dt=new Date(STATE.year,STATE.month+1,1); STATE.year=dt.getFullYear(); STATE.month=dt.getMonth(); STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; STATE.trendSelectedIndex=null; update(); },
   setMonthDropdown(value){
     const [y,m]=value.split("-").map(Number);
-    STATE.year=y; STATE.month=m; STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; update();
+    STATE.year=y; STATE.month=m; STATE.calendarDay=null; STATE.openRowMenu=null; STATE.showSafeInfo=false; STATE.trendSelectedIndex=null; update();
   },
   toggleSafeInfo(){ STATE.showSafeInfo=!STATE.showSafeInfo; render(); },
   toggleCalendarDay(dd){ STATE.calendarDay = STATE.calendarDay===dd? null: dd; STATE.openRowMenu=null; render(); },
-  setTrendMode(m){ STATE.trendMode=m; render(); },
+  setTrendMode(m){ STATE.trendMode=m; STATE.trendSelectedIndex=null; render(); },
+  selectTrendPoint(i){ STATE.trendSelectedIndex = STATE.trendSelectedIndex===i ? null : i; render(); },
   setHistoryFilter(k,v){ STATE.historyFilters[k]=v; STATE.openRowMenu=null; update(); },
   openFilterSheet(type){ STATE.openFilterSheet=type; render(); },
   closeFilterSheet(e){ if(e && e.target!==e.currentTarget) return; STATE.openFilterSheet=null; render(); },
